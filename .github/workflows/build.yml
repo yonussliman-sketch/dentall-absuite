@@ -1,53 +1,54 @@
 name: Build APK
+
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Unzip project
-        run: |
-          ls -la
-          unzip -q -o DentalLabSuite_Local.zip
+        run: unzip -q -o DentalLabSuite_Local.zip
 
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Grant execute permission for gradlew
-        working-directory: DentalLabSuite
-        run: chmod +x gradlew
-
       - name: Build both apps
-        working-directory: DentalLabSuite
-        run: ./gradlew :clinic:assembleDebug :lab:assembleDebug --no-daemon --stacktrace
+        run: |
+          PROJECT_DIR="."
+          if [ -d "DentalLabSuite" ] && [ -f "DentalLabSuite/gradlew" ]; then
+            PROJECT_DIR="DentalLabSuite"
+          elif [ -f "gradlew" ]; then
+            PROJECT_DIR="."
+          else
+            FOUND_GRADLEW=$(find . -maxdepth 3 -name "gradlew" -type f | head -n 1)
+            if [ -n "$FOUND_GRADLEW" ]; then
+              PROJECT_DIR=$(dirname "$FOUND_GRADLEW")
+            fi
+          fi
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew :clinic:assembleDebug :lab:assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload clinic APK
+        uses: actions/upload-artifact@v4
         if: success()
         with:
           name: clinic-apk
-          path: DentalLabSuite/clinic/build/outputs/apk/debug/*.apk
+          path: "**/clinic/build/outputs/apk/debug/*.apk"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload lab APK
+        uses: actions/upload-artifact@v4
         if: success()
         with:
           name: lab-apk
-          path: DentalLabSuite/lab/build/outputs/apk/debug/*.apk
-
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-logs
-          path: |
-            DentalLabSuite/**/build/reports/
-            DentalLabSuite/**/build/outputs/logs/
+          path: "**/lab/build/outputs/apk/debug/*.apk"
