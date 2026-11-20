@@ -1,0 +1,47 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: unzip -q -o DentalLabSuite_Local.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build both apps
+        working-directory: DentalLabSuite
+        run: ./gradlew :clinic:assembleDebug :lab:assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: clinic-apk
+          path: DentalLabSuite/clinic/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: lab-apk
+          path: DentalLabSuite/lab/build/outputs/apk/debug/*.apk
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: |
+            DentalLabSuite/**/build/reports/
+            DentalLabSuite/**/build/outputs/logs/
